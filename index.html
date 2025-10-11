@@ -112,9 +112,12 @@
         function renderPage(num) {
             pageRendering = true;
             pdfDoc.getPage(num).then(function(page) {
-                const viewport = page.getViewport({ scale: scale });
+                const devicePixelRatio = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({ scale: scale * devicePixelRatio });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
+                canvas.style.width = (viewport.width / devicePixelRatio) + 'px';
+                canvas.style.height = (viewport.height / devicePixelRatio) + 'px';
 
                 const renderContext = {
                     canvasContext: ctx,
