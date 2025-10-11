@@ -50,6 +50,11 @@
         #toolbar button:hover {
             background-color: #555;
         }
+        @media (max-width: 767px) {
+            #print {
+                display: none;
+            }
+        }
         #page_num {
             width: 40px;
             text-align: center;
@@ -102,7 +107,7 @@
         let pageNum = 1;
         let pageRendering = false;
         let pageNumPending = null;
-        let scale = 1.5;
+        let scale = window.innerWidth < 768 ? 1 : 1.5;
 
         function renderPage(num) {
             pageRendering = true;
