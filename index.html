@@ -4,59 +4,194 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ছায়ান্বিত '২৬ নামা</title>
+    <meta name="author" content="আরিয়ান মল্লিক ওয়াসি">
+    <meta name="description" content="একটি বিদায় অনুষ্ঠানের আদ্যোপান্ত. Author: আরিয়ান মল্লিক ওয়াসি, ক্যাশিয়ার, ছায়ান্বিত '26.">
+    <meta property="og:title" content="ছায়ান্বিত '২৬ নামা" />
+    <meta property="og:description" content="একটি বিদায় অনুষ্ঠানের আদ্যোপান্ত by আরিয়ান মল্লিক ওয়াসি" />
+    <meta property="og:type" content="book" />
+    <meta property="og:book:author" content="আরিয়ান মল্লিক ওয়াসি" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
     <style>
-        body {
-            font-family: 'Siyam Rupali', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+        body, html {
             margin: 0;
+            padding: 0;
+            height: 100%;
             background-color: #f0f0f0;
-            text-align: center;
+            font-family: sans-serif;
+        }
+        #viewer-container {
+            display: flex;
             flex-direction: column;
+            height: 100%;
         }
-        .container {
-            padding: 2em;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-        }
-        h2 {
-            color: #555;
-            font-weight: normal;
-        }
-        p {
-            color: #777;
-        }
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            margin-top: 20px;
-            font-size: 16px;
+        #toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            background-color: #333;
             color: white;
-            background-color: #007bff;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
+            flex-shrink: 0;
+        }
+        #toolbar button, #toolbar input, #toolbar span {
+            margin: 0 5px;
+        }
+        #toolbar button {
+            background: none;
+            border: 1px solid white;
+            color: white;
+            border-radius: 4px;
+            padding: 5px 10px;
             cursor: pointer;
         }
-        .button:hover {
-            background-color: #0056b3;
+        #toolbar button:hover {
+            background-color: #555;
+        }
+        #page_num {
+            width: 40px;
+            text-align: center;
+        }
+        #viewer {
+            flex-grow: 1;
+            overflow: auto;
+            padding: 20px 0;
+        }
+        #pdf-canvas {
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #ccc;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #loading-message {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.2em;
         }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Siyam+Rupali&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <h1>ছায়ান্বিত '২৬ নামা</h1>
-        <h2>একটি বিদায় অনুষ্ঠানের আদ্যোপান্ত</h2>
-        <p>লেখক: আরিয়ান মল্লিক ওয়াসি</p>
-        <p>ক্যাশিয়ার, ছায়ান্বিত '26</p>
-        <a href="book.html" class="button">বইটি পড়ুন</a>
+
+    <div id="viewer-container">
+        <div id="toolbar">
+            <button id="prev"><i class="fas fa-arrow-left"></i> Prev</button>
+            <span>Page: <input type="number" id="page_num" value="1"> / <span id="page_count">0</span></span>
+            <button id="next">Next <i class="fas fa-arrow-right"></i></button>
+            <button id="zoom_in"><i class="fas fa-search-plus"></i></button>
+            <button id="zoom_out"><i class="fas fa-search-minus"></i></button>
+            <button id="print"><i class="fas fa-print"></i> Print</button>
+        </div>
+        <div id="viewer">
+            <div id="loading-message">Loading book...</div>
+            <canvas id="pdf-canvas"></canvas>
+        </div>
     </div>
+
+    <script>
+        const url = 'book.pdf';
+        const { pdfjsLib } = window;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const canvas = document.getElementById('pdf-canvas');
+        const ctx = canvas.getContext('2d');
+        const loadingMessage = document.getElementById('loading-message');
+        
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageRendering = false;
+        let pageNumPending = null;
+        let scale = 1.5;
+
+        function renderPage(num) {
+            pageRendering = true;
+            pdfDoc.getPage(num).then(function(page) {
+                const viewport = page.getViewport({ scale: scale });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+                const renderTask = page.render(renderContext);
+
+                renderTask.promise.then(function() {
+                    pageRendering = false;
+                    if (pageNumPending !== null) {
+                        renderPage(pageNumPending);
+                        pageNumPending = null;
+                    }
+                });
+            });
+            document.getElementById('page_num').value = num;
+        }
+
+        function queueRenderPage(num) {
+            if (pageRendering) {
+                pageNumPending = num;
+            } else {
+                renderPage(num);
+            }
+        }
+
+        function onPrevPage() {
+            if (pageNum <= 1) return;
+            pageNum--;
+            queueRenderPage(pageNum);
+        }
+        document.getElementById('prev').addEventListener('click', onPrevPage);
+
+        function onNextPage() {
+            if (pageNum >= pdfDoc.numPages) return;
+            pageNum++;
+            queueRenderPage(pageNum);
+        }
+        document.getElementById('next').addEventListener('click', onNextPage);
+
+        function onZoomIn() {
+            scale += 0.1;
+            queueRenderPage(pageNum);
+        }
+        document.getElementById('zoom_in').addEventListener('click', onZoomIn);
+
+        function onZoomOut() {
+            if (scale <= 0.5) return;
+            scale -= 0.1;
+            queueRenderPage(pageNum);
+        }
+        document.getElementById('zoom_out').addEventListener('click', onZoomOut);
+
+        function onPageNumChange() {
+            const num = parseInt(document.getElementById('page_num').value);
+            if (num > 0 && num <= pdfDoc.numPages) {
+                pageNum = num;
+                queueRenderPage(pageNum);
+            } else {
+                document.getElementById('page_num').value = pageNum;
+            }
+        }
+        document.getElementById('page_num').addEventListener('change', onPageNumChange);
+
+        function onPrint() {
+            const printWindow = window.open(url);
+            printWindow.onload = () => {
+                printWindow.print();
+            };
+        }
+        document.getElementById('print').addEventListener('click', onPrint);
+
+        pdfjsLib.getDocument(url).promise.then(function(pdfDoc_) {
+            pdfDoc = pdfDoc_;
+            document.getElementById('page_count').textContent = pdfDoc.numPages;
+            loadingMessage.style.display = 'none';
+            renderPage(pageNum);
+        }).catch(function(error) {
+            console.error('Error loading PDF: ' + error);
+            loadingMessage.textContent = 'Failed to load book.pdf. Please make sure the file exists in the root directory.';
+        });
+    </script>
+
 </body>
 </html>
